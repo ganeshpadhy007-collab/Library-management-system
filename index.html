@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Library Management System</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+body { background: #f4f6f8; padding: 20px; }
+.container { max-width: 1000px; margin: auto; }
+h1 { text-align: center; color: #2d3748; margin-bottom: 20px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+}
+
+.box {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+button {
+  background: #4f46e5;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+button:hover { background: #4338ca; }
+button.delete { background: #ef4444; }
+button.issue { background: #10b981; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+th { background: #f9fafb; color: #374151; }
+.available { color: #10b981; font-weight: 600; }
+.issued { color: #ef4444; font-weight: 600; }
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.tab {
+  padding: 10px 20px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tab.active {
+  background: #4f46e5;
+  color: white;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📚 Library Management System</h1>
+  
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('books')">Books</div>
+    <div class="tab" onclick="switchTab('issue')">Issue/Return</div>
+  </div>
+
+  <div id="books" class="tab-content active">
+    <div class="grid">
+      <div class="box">
+        <h3>Add New Book</h3>
+        <input type="text" id="title" placeholder="Book Title">
+        <input type="text" id="author" placeholder="Author Name">
+        <select id="category">
+          <option value="Fiction">Fiction</option>
+          <option value="Science">Science</option>
+          <option value="History">History</option>
+          <option value="Programming">Programming</option>
+        </select>
+        <button onclick="addBook()">Add Book</button>
+        
+        <h3 style="margin-top:20px;">Search Book</h3>
+        <input type="text" id="search" placeholder="Search by title or author" onkeyup="searchBook()">
+      </div>
+
+      <div class="box">
+        <h3>All Books</h3>
+        <table id="bookTable">
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Author</th><th>Category</th><th>Status</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="bookBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="issue" class="tab-content">
+    <div class="grid">
+      <div class="box">
+        <h3>Issue Book</h3>
+        <input type="number" id="bookId" placeholder="Enter Book ID">
+        <input type="text" id="studentName" placeholder="Student Name">
+        <button class="issue" onclick="issueBook()">Issue Book</button>
+        
+        <h3 style="margin-top:20px;">Return Book</h3>
+        <input type="number" id="returnBookId" placeholder="Enter Book ID">
+        <button onclick="returnBook()">Return Book</button>
+      </div>
+
+      <div class="box">
+        <h3>Issued Books</h3>
+        <table id="issuedTable">
+          <thead>
+            <tr><th>Book ID</th><th>Title</th><th>Student</th><th>Action</th></tr>
+          </thead>
+          <tbody id="issuedBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let books = JSON.parse(localStorage.getItem('books')) || [];
+let issuedBooks = JSON.parse(localStorage.getItem('issuedBooks')) || [];
+let bookIdCounter = books.length > 0 ? Math.max(...books.map(b => b.id)) + 1 : 101;
+
+function saveData() {
+  localStorage.setItem('books', JSON.stringify(books));
+  localStorage.setItem('issuedBooks', JSON.stringify(issuedBooks));
+}
+
+function addBook() {
+  const title = document.getElementById('title').value;
+  const author = document.getElementById('author').value;
+  const category = document.getElementById('category').value;
+
+  if (!title || !author) {
+    alert('Please fill all fields');
+    return;
+  }
+
+  books.push({ id: bookIdCounter++, title, author, category, status: 'Available' });
+  saveData();
+  displayBooks();
+  
+  document.getElementById('title').value = '';
+  document.getElementById('author').value = '';
+}
+
+function displayBooks() {
+  const tbody = document.getElementById('bookBody');
+  tbody.innerHTML = '';
+  
+  books.forEach(book => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${book.id}</td>
+      <td>${book.title}</td>
+      <td>${book.author}</td>
+      <td>${book.category}</td>
+      <td class="${book.status === 'Available' ? 'available' : 'issued'}">${book.status}</td>
+      <td>
+        <button class="delete" onclick="deleteBook(${book.id})">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function searchBook() {
+  const keyword = document.getElementById('search').value.toLowerCase();
+  const filtered = books.filter(b => 
+    b.title.toLowerCase().includes(keyword) || 
+    b.author.toLowerCase().includes(keyword)
+  );
+  
+  const tbody = document.getElementById('bookBody');
+  tbody.innerHTML = '';
+  
+  filtered.forEach(book => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${book.id}</td>
+      <td>${book.title}</td>
+      <td>${book.author}</td>
+      <td>${book.category}</td>
+      <td class="${book.status === 'Available' ? 'available' : 'issued'}">${book.status}</td>
+      <td>
+        <button class="delete" onclick="deleteBook(${book.id})">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteBook(id) {
+  books = books.filter(b => b.id !== id);
+  saveData();
+  displayBooks();
+}
+
+function issueBook() {
+  const bookId = parseInt(document.getElementById('bookId').value);
+  const studentName = document.getElementById('studentName').value;
+  
+  const book = books.find(b => b.id === bookId);
+  if (!book) {
+    alert('Book not found!');
+    return;
+  }
+  if (book.status === 'Issued') {
+    alert('Book already issued!');
+    return;
+  }
+  
+  book.status = 'Issued';
+  issuedBooks.push({ bookId, title: book.title, student: studentName });
+  
+  saveData();
+  displayBooks();
+  displayIssuedBooks();
+  
+  document.getElementById('bookId').value = '';
+  document.getElementById('studentName').value = '';
+}
+
+function returnBook() {
+  const bookId = parseInt(document.getElementById('returnBookId').value);
+  const book = books.find(b => b.id === bookId);
+  
+  if (!book) {
+    alert('Book not found!');
+    return;
+  }
+  
+  book.status = 'Available';
+  issuedBooks = issuedBooks.filter(ib => ib.bookId !== bookId);
+  
+  saveData();
+  displayBooks();
+  displayIssuedBooks();
+  
+  document.getElementById('returnBookId').value = '';
+}
+
+function displayIssuedBooks() {
+  const tbody = document.getElementById('issuedBody');
+  tbody.innerHTML = '';
+  
+  issuedBooks.forEach(ib => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${ib.bookId}</td>
+      <td>${ib.title}</td>
+      <td>${ib.student}</td>
+      <td>
+        <button onclick="returnBookById(${ib.bookId})">Return</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function returnBookById(id) {
+  document.getElementById('returnBookId').value = id;
+  returnBook();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tab).classList.add('active');
+}
+
+displayBooks();
+displayIssuedBooks();
+</script>
+</body>
+</html>
